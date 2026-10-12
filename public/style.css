@@ -59,10 +59,6 @@ button:disabled {
   opacity: 0.25;
   cursor: default;
 }
-button:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 4px;
-}
 button:active:not(:disabled) {
   transform: scale(0.97);
 }
@@ -570,10 +566,6 @@ button[aria-pressed="true"] i {
     background: #fff;
   }
 }
-body.keyboard-input button:focus {
-  outline: 2px solid #fff;
-  outline-offset: 4px;
-}
 
 .brightness-layout {
   width: 100%;
@@ -626,10 +618,6 @@ input[type="range"]::-webkit-slider-thumb {
   border-radius: 50%;
   background: #eee;
   border: 0;
-}
-.keyboard-input input[type="range"]:focus {
-  outline: 2px solid #fff;
-  outline-offset: 4px;
 }
 #feedback {
   position: fixed;
@@ -938,11 +926,6 @@ button.touch-feedback svg {
   cursor: pointer;
   touch-action: manipulation;
 }
-#clock-face:focus-visible,
-#timer-wheel:focus-visible {
-  outline: 2px solid #fff;
-  outline-offset: 4px;
-}
 #clock-bold-time {
   font-size: 144px;
   font-weight: 500;
@@ -1061,9 +1044,6 @@ button.touch-feedback svg {
 }
 
 *:focus {
-  outline: none !important;
-}
-*:focus-visible {
   outline: none !important;
 }
 #clock,

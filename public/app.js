@@ -84,14 +84,6 @@ function nextView() {
   selectView((view + 1) % views.length);
 }
 window.addEventListener("carthing:view-next", nextView);
-window.addEventListener("pointerdown", () =>
-  document.body.classList.remove("keyboard-input"),
-);
-window.addEventListener(
-  "touchstart",
-  () => document.body.classList.remove("keyboard-input"),
-  { passive: true },
-);
 let touchedButton;
 function pressFeedback(e) {
   const button = e.target.closest && e.target.closest("button");
@@ -114,7 +106,6 @@ window.addEventListener("touchstart", pressFeedback, {
   window.addEventListener(name, releaseFeedback, true),
 );
 window.addEventListener("keydown", (e) => {
-  if (e.key === "Tab") document.body.classList.add("keyboard-input");
   if (e.repeat) return;
   if (e.key === "F13" || e.key === "Escape") {
     e.preventDefault();
@@ -975,6 +966,7 @@ function tick() {
       ) {
         state.timer = {
           phase: "finished",
+          duration: state.timer.duration,
           remaining: 0,
           endsAt: 0,
           finishedAt: helperNow(),

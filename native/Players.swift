@@ -1,3 +1,4 @@
+import CryptoKit
 import Foundation
 
 // Only retain players we can address independently: Music and bridged tabs.
@@ -6,6 +7,7 @@ final class Players {
     struct Player {
         var media: [String: Any]
         var artwork: Data
+        var artworkVersion: String
         var encoded: String
         var started: TimeInterval
     }
@@ -21,8 +23,16 @@ final class Players {
             || (playing
                 && (previous?.media["playing"] as? Bool != true
                     || previous?.media["title"] as? String != media["title"] as? String))
+        let version: String
+        if let previous = previous, previous.artwork == artwork {
+            version = previous.artworkVersion
+        } else {
+            version = artwork.isEmpty ? "" : String(
+                SHA256.hash(data: artwork).map { String(format: "%02x", $0) }.joined().prefix(24))
+        }
         items[id] = Player(
-            media: media, artwork: artwork, encoded: encoded,
+            media: media, artwork: artwork, artworkVersion: version,
+            encoded: encoded,
             started: started ? Date().timeIntervalSince1970 : previous!.started)
         if selected.isEmpty || started && playing { selected = id }
         if items.count > 8, let oldest = ordered.last { remove(oldest) }

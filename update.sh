@@ -29,4 +29,5 @@ for line in subprocess.check_output(['ps','-Ao','pid=,args=']).decode().splitlin
   else:raise SystemExit('The helper did not quit. Start the updated app after closing it.')
 PY
 open CarThing.app
+rm -rf -- "$previous_app"
 print "SideThing $release_tag is running. Pairing and settings were retained."

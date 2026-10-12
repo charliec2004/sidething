@@ -103,6 +103,7 @@ final class Service {
     let countdown = Countdown(file: runtime.appendingPathComponent("timer.json"))
     var musicModes: [String: Any]?
     var musicRefreshing = false, musicSignature = ""
+    var musicGeneration = 0
     var musicObserver: NSObjectProtocol?
     var musicTermination: NSObjectProtocol?
     var nightShift: [String: Any] = ["supported": false, "enabled": false, "strength": 0]
@@ -112,8 +113,8 @@ final class Service {
     var weather: [String: Any] = ["status": "unconfigured"]
     var settings: [String: Any] = ["unit": "fahrenheit"]
     var currentLocation: [String: Any]?
-    var artwork = Data(), artworkHash = "", sourceArtwork = ""
-    var nativeArtwork = Data(), nativeArtworkHash = ""
+    var artwork = Data(), sourceArtwork = ""
+    var nativeArtwork = Data()
     var child: Process?, restartTimer: Timer?, heartbeat: Timer?, weatherTimer: Timer?
     var controlBusy = false, shuttingDown = false, weatherBusy = false
     var rates: [String: [TimeInterval]] = [:]
@@ -167,6 +168,7 @@ final class Service {
                         as? NSRunningApplication, application.bundleIdentifier == "com.apple.Music",
                     let self = self
                 else { return }
+                self.musicGeneration += 1
                 self.players.remove("com.apple.Music")
                 self.musicModes = nil
                 self.selectPlayer()
@@ -270,10 +272,8 @@ final class Service {
         guard !m.isEmpty, !text(m["title"]).isEmpty else {
             media = ["status": "empty", "kind": "unknown"]
             artwork.removeAll()
-            artworkHash = ""
             sourceArtwork = ""
             nativeArtwork.removeAll()
-            nativeArtworkHash = ""
             players.nativeChanged("")
             selectPlayer()
             publish()
@@ -302,15 +302,8 @@ final class Service {
             if encoded.count <= 7_000_000, let bytes = Data(base64Encoded: encoded), !bytes.isEmpty
             {
                 nativeArtwork = thumbnail(bytes)
-                nativeArtworkHash =
-                    nativeArtwork.isEmpty
-                    ? ""
-                    : String(
-                        SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined().prefix(
-                            24))
             } else {
                 nativeArtwork.removeAll()
-                nativeArtworkHash = ""
             }
         }
         artwork = nativeArtwork
@@ -320,9 +313,7 @@ final class Service {
         {
             artwork = previous.artwork
         }
-        artworkHash = nativeArtworkHash
         media["seekStep"] = seekStep
-        media["artworkVersion"] = artworkHash
 
         let appleMusic = source == "com.apple.Music"
         if appleMusic, let modes = musicModes { media.merge(modes) { _, next in next } }
@@ -355,24 +346,16 @@ final class Service {
             media["sourceId"] = players.selected
             media["sourceCount"] = players.items.count
             artwork = player.artwork
-            artworkHash =
-                artwork.isEmpty
-                ? ""
-                : String(
-                    SHA256.hash(data: artwork).map { String(format: "%02x", $0) }.joined().prefix(
-                        24))
-            media["artworkVersion"] = artworkHash
+            media["artworkVersion"] = player.artworkVersion
         } else {
             media = ["status": "empty", "kind": "unknown"]
             artwork.removeAll()
-            artworkHash = ""
         }
     }
     func updateMusic(_ value: [String: Any]) {
         if text(nativePayload["bundleIdentifier"]) == "com.apple.Music" {
             if text(nativePayload["title"]) != text(value["title"]) {
                 nativeArtwork.removeAll()
-                nativeArtworkHash = ""
                 sourceArtwork = ""
                 nativePayload["artworkData"] = nil
             }
@@ -425,7 +408,7 @@ final class Service {
         }
     }
     func refreshMusic() {
-        guard !musicRefreshing,
+        guard !musicRefreshing, !controlBusy, !shuttingDown,
             !CommandLine.arguments.contains("--headless") || env["CARTHING_MUSIC_BIN"] != nil,
             env["CARTHING_MUSIC_BIN"] != nil
                 || !NSRunningApplication.runningApplications(
@@ -433,11 +416,17 @@ final class Service {
                 ).isEmpty
         else { return }
         musicRefreshing = true
+        let generation = musicGeneration
         DispatchQueue.global(qos: .utility).async { [weak self] in
             let value = musicCommand()
             DispatchQueue.main.async {
                 guard let self = self else { return }
                 self.musicRefreshing = false
+                guard !self.shuttingDown else { return }
+                guard generation == self.musicGeneration else {
+                    self.refreshMusic()
+                    return
+                }
                 if let value = value { self.updateMusic(value) }
             }
         }
@@ -1007,6 +996,7 @@ final class Service {
             ]
         }
         let useMusic = media["source"] as? String == "com.apple.Music"
+        if useMusic { musicGeneration += 1 }
         controlBusy = true
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
@@ -1024,8 +1014,8 @@ final class Service {
                 }
                 if let musicResult = musicResult {
                     self.updateMusic(musicResult)
-                    self.refreshMusic()
                     self.controlBusy = false
+                    self.refreshMusic()
                     self.reply(peer, 200, json(["ok": true]))
                     return
                 }

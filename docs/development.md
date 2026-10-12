@@ -4,7 +4,7 @@
 
 ## Keep it small
 
-- Merge incremental media updates. Decode and resize artwork only when it changes.
+- Merge incremental media updates. Decode, resize and hash artwork only when it changes.
 - Reuse DOM nodes; update controls and forecasts only when their state changes.
 - Run the display timer only for visible clock seconds, a running countdown or a playing timeline. Clocks without seconds wake once per minute. Countdown completion uses one native deadline and persists across helper restarts. Mac timestamps keep the countdown aligned; completion opens the timer and pulses for 45 seconds before becoming static. Done dismisses the alert; Replay starts the saved duration again. The dial controls brightness on Settings, minutes in the timer selector and volume elsewhere.
 - Use CoreAudio callbacks for output/volume state; enumerate outputs when requested.

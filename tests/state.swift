@@ -33,6 +33,13 @@ import Foundation
         p.update("music", media: media("Album", false), artwork: Data())
         p.cycle(); precondition(p.selected == "browser:1")
         p.remove("browser:1"); precondition(p.selected == "music")
+        let artwork = Data([1, 2, 3])
+        p.update("music", media: media("Album", false), artwork: artwork)
+        let version = p.current!.artworkVersion
+        p.update("music", media: media("Album", true), artwork: artwork)
+        precondition(p.current!.artworkVersion == version, "Metadata must retain the artwork version")
+        p.update("music", media: media("Album", true), artwork: Data([4, 5, 6]))
+        precondition(p.current!.artworkVersion != version, "New artwork needs a new version")
         print("PASS: timer pause/resume, minute adjustment, persistence and single completion; newest player selection, manual cycling and removal.")
     }
 }

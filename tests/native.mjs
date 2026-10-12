@@ -51,7 +51,7 @@ fs.writeFileSync(
 let providerSource = fs.readFileSync(provider, "utf8");
 providerSource = providerSource.replace(
   "if(args[0]==='stream')",
-  `if(args[0]==='--music-control') {const f=${JSON.stringify(musicFile)},m=JSON.parse(fs.readFileSync(f));if(args[1]==='repeat'||args[1]==='shuffle')m[args[1]+'Mode']=Number(args[2]);if(args[1]==='toggle-play-pause')m.playing=!m.playing;if(args[1]==='seek')m.elapsed=Number(args[2]);m.timestamp=Date.now();fs.writeFileSync(f,JSON.stringify(m));console.log(JSON.stringify(m));process.exit(0);}
+  `if(args[0]==='--music-control') {const f=${JSON.stringify(musicFile)},m=JSON.parse(fs.readFileSync(f));if(args[1]==='repeat'||args[1]==='shuffle')m[args[1]+'Mode']=Number(args[2]);if(args[1]==='toggle-play-pause')m.playing=!m.playing;if(args[1]==='seek')m.elapsed=Number(args[2]);m.timestamp=Date.now();if(args[1]==='get')await new Promise(r=>setTimeout(r,200));else fs.writeFileSync(f,JSON.stringify(m));console.log(JSON.stringify(m));process.exit(0);}
 if(args[0]==='stream')`,
 );
 fs.writeFileSync(provider, providerSource);
@@ -472,6 +472,12 @@ try {
     200,
   );
   assert.equal(JSON.parse(fs.readFileSync(musicFile)).elapsed, 15);
+  await pause(450);
+  assert.equal(
+    (await state()).media.elapsed,
+    15,
+    "Old Music reads cannot revert a seek",
+  );
   console.log(
     "PASS: incremental metadata and deleted fields; native playback dispatch and streamed state; repeat off/all/one; shuffle; music/video capabilities; seeking exactly ±10 seconds; authentication/origin/input validation; 20 closed SSE clients released; saved pairing after 10 restarts; browser native-messaging metadata, commands and acknowledgement. Fixture provider only; real media unchanged.",
   );

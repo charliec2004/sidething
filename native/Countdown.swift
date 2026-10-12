@@ -23,7 +23,8 @@ final class Countdown {
             self.endsAt = end
             self.finishedAt = max(0, saved["finishedAt"] as? Double ?? 0)
             if let duration = saved["duration"] as? Double, duration.isFinite,
-                (0...86400).contains(duration) {
+                (0...86400).contains(duration)
+            {
                 self.duration = duration
             } else if phase != "idle" {
                 self.duration = max(60, ceil(remaining / 60) * 60)
@@ -45,7 +46,8 @@ final class Countdown {
                 action == "set"
                 ? Double(minutes * 60) : (phase == "idle" ? 60 : seconds) + Double(minutes * 60)
             remaining = min(86400, max(60, value))
-            duration = (phase == "running" || phase == "paused") && action == "adjust"
+            duration =
+                (phase == "running" || phase == "paused") && action == "adjust"
                 ? min(86400, max(60, duration + Double(minutes * 60))) : remaining
             if phase == "running" {
                 endsAt = now() + remaining
@@ -106,7 +108,8 @@ final class Countdown {
     }
     func save() {
         let saved: [String: Any] = [
-            "phase": phase, "remaining": remaining, "endsAt": endsAt, "finishedAt": finishedAt, "duration": duration,
+            "phase": phase, "remaining": remaining, "endsAt": endsAt,
+            "finishedAt": finishedAt, "duration": duration,
         ]
         if let data = try? JSONSerialization.data(withJSONObject: saved) {
             try? data.write(to: file, options: .atomic)

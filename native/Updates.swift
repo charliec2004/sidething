@@ -10,6 +10,7 @@ func checkForUpdates() {
     URLSession.shared.dataTask(with: request) { data, response, _ in
         DispatchQueue.main.async {
             let alert = NSAlert()
+            alert.icon = NSImage(contentsOf: resources.appendingPathComponent("AppIcon.icns"))
             alert.messageText = "SideThing updates"
             guard (response as? HTTPURLResponse)?.statusCode == 200, let data = data,
                 let release = try? JSONSerialization.jsonObject(with: data) as? [String: Any],

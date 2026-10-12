@@ -40,6 +40,25 @@ enum SystemAudio {
         else { return "Audio output" }
         return value.takeRetainedValue() as String
     }
+    static func kind(_ id: AudioDeviceID, name: String) -> String {
+        let label = name.lowercased()
+        if label.contains("airpods") { return "airpods" }
+        if ["headphone", "headset", "earbud", "earphone"].contains(where: label.contains) { return "headphones" }
+        var address = property(kAudioDevicePropertyStreams, output: true), size: UInt32 = 0
+        guard AudioObjectGetPropertyDataSize(id, &address, 0, nil, &size) == noErr, size > 0 else { return "speaker" }
+        var streams = [AudioStreamID](repeating: 0, count: Int(size) / MemoryLayout<AudioStreamID>.size)
+        let ok = streams.withUnsafeMutableBytes { AudioObjectGetPropertyData(id, &address, 0, nil, &size, $0.baseAddress!) }
+        guard ok == noErr else { return "speaker" }
+        for stream in streams {
+            var terminal = property(kAudioStreamPropertyTerminalType), value: UInt32 = 0, count: UInt32 = 4
+            if AudioObjectGetPropertyData(stream, &terminal, 0, nil, &count, &value) == noErr, value == kAudioStreamTerminalTypeHeadphones { return "headphones" }
+        }
+        return "speaker"
+    }
+    static func descriptor(_ id: AudioDeviceID) -> [String: Any] {
+        let label = name(id)
+        return ["id": id, "name": label, "kind": kind(id, name: label)]
+    }
     static func volume(_ id: AudioDeviceID) -> Float32? {
         var address = property(kAudioHardwareServiceDeviceProperty_VirtualMainVolume, output: true)
         var value = Float32(0)
@@ -67,7 +86,7 @@ enum SystemAudio {
         current = [
             "outputRevision": inventoryVersion,
             "volume": volume(device).map { Double($0) } ?? NSNull(),
-            "output": device == 0 ? NSNull() : ["id": device, "name": name(device)],
+            "output": device == 0 ? NSNull() : descriptor(device),
         ]
         changed?()
     }
@@ -115,7 +134,7 @@ enum SystemAudio {
                 == noErr && alive != 0
                 && AudioObjectGetPropertyDataSize(id, &streams, 0, nil, &count) == noErr
                 && count > 0
-        }.map { ["id": $0, "name": name($0)] }
+        }.map { descriptor($0) }
     }
     static func select(_ id: AudioDeviceID) -> Bool {
         guard outputs().contains(where: { $0["id"] as? UInt32 == id }) else { return false }

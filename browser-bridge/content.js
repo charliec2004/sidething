@@ -106,7 +106,7 @@ scan();
 chrome.runtime.onMessage.addListener(async (message) => {
   if (
     !message.id ||
-    !["toggle-play-pause", "seek-back", "seek-forward"].includes(message.action)
+    !["toggle-play-pause", "seek-back", "seek-forward", "seek"].includes(message.action)
   )
     return;
   if (handled.has(message.id)) {
@@ -129,7 +129,7 @@ chrome.runtime.onMessage.addListener(async (message) => {
         0,
         Math.min(
           video.duration || Infinity,
-          video.currentTime + (message.action === "seek-back" ? -10 : 10),
+          (message.action === "seek" && Number.isFinite(message.seconds) ? message.seconds : video.currentTime + (message.action === "seek-back" ? -10 : 10)),
         ),
       );
     ok = true;

@@ -315,6 +315,8 @@ button[aria-pressed="true"] {
   color: #b7df9e;
 }
 button i {
+  left: 50%;
+  transform: translateX(-50%);
   display: none;
   position: absolute;
   width: 5px;
@@ -327,13 +329,9 @@ button[aria-pressed="true"] i {
   display: block;
 }
 #repeatone {
-  position: absolute;
-  font-size: 16px;
-  font-weight: 600;
-  top: 33px;
-  left: 40px;
-  background: #090a0b;
-  padding: 0 1px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.4;
 }
 .weather-layout {
   display: grid;
@@ -523,11 +521,7 @@ button[aria-pressed="true"] i {
     width: 42px;
     height: 42px;
   }
-  #repeatone {
-    font-size: 12px;
-    top: 23px;
-    left: 23px;
-  }
+
   .weather-layout {
     padding: 0;
     gap: 22px;
@@ -802,4 +796,412 @@ input[type="range"]::-webkit-slider-thumb {
 #outputs-state,
 #outputs-retry {
   flex-shrink: 0;
+}
+
+/* Brief local acknowledgement; artwork and metadata do not flash. */
+.controls button.acknowledged:not(#play) {
+  background: #232528;
+  transform: scale(0.94);
+}
+#timer-layout {
+  position: absolute;
+  top: 64px;
+  left: 24px;
+  right: 24px;
+  bottom: 24px;
+  text-align: center;
+}
+#timer-wheel {
+  margin: 20px auto 0;
+  touch-action: none;
+  outline: none;
+}
+.minute-wheel {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 64px;
+  font-variant-numeric: tabular-nums;
+}
+.minute-wheel span,
+.minute-wheel button {
+  font-size: 48px;
+  font-weight: 300;
+  color: #4a4d52;
+  min-width: 104px;
+}
+.minute-wheel strong {
+  font-size: 112px;
+  font-weight: 300;
+  min-width: 240px;
+  letter-spacing: -4px;
+  transition: transform 0.12s ease;
+}
+#timer-wheel.turning strong {
+  transform: translateY(-4px);
+}
+.minute-unit {
+  display: block;
+  margin-top: 4px;
+  font-size: 24px;
+  color: #91949c;
+}
+#timer-readout {
+  display: block;
+  margin-top: 44px;
+  font-size: 112px;
+  font-weight: 300;
+  letter-spacing: -4px;
+  font-variant-numeric: tabular-nums;
+}
+.timer-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 112px;
+}
+#timer-toggle {
+  position: absolute;
+  left: 50%;
+  margin-left: -56px;
+  width: 112px;
+  height: 112px;
+  background: #eee;
+  color: #101113;
+}
+#timer-toggle svg {
+  width: 54px;
+  height: 54px;
+}
+#timer-playicon {
+  transform: translateX(-1px);
+}
+#timer-reset {
+  position: absolute;
+  left: calc(50% + 104px);
+  top: 12px;
+  color: #91949c;
+}
+#timer-layout.finished #timer-readout {
+  color: #e9d8a6;
+}
+@media (max-width: 650px) {
+  #timer-layout {
+    top: 160px;
+    bottom: 80px;
+  }
+  .minute-wheel {
+    gap: 14px;
+  }
+  .minute-wheel span,
+  .minute-wheel button {
+    font-size: 30px;
+    min-width: 54px;
+  }
+  .minute-wheel strong {
+    font-size: 84px;
+    min-width: 180px;
+  }
+  #timer-readout {
+    font-size: 84px;
+  }
+}
+
+button.touch-feedback,
+.controls button.acknowledged:not(#play) {
+  box-shadow: inset 0 0 0 3px #eee;
+  background: #34373b;
+  transform: scale(0.95);
+}
+#play.touch-feedback,
+#timer-toggle.touch-feedback {
+  background: #c5c7cb;
+  box-shadow: inset 0 0 0 3px #fff;
+}
+button.touch-feedback svg {
+  transform: translate(-50%, -50%) scale(0.9);
+}
+.controls button[aria-busy="true"] {
+  box-shadow: inset 0 0 0 2px #858991;
+}
+#clock-face {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  bottom: 24px;
+  left: 24px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  touch-action: manipulation;
+}
+#clock-face:focus-visible,
+#timer-wheel:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 4px;
+}
+#clock-bold-time {
+  font-size: 144px;
+  font-weight: 500;
+  letter-spacing: -7px;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+#clock-bold-extra {
+  display: block;
+  margin-top: 18px;
+  font-size: 36px;
+  color: #a2a4ab;
+  font-variant-numeric: tabular-nums;
+}
+#clock-analog svg {
+  width: 320px;
+  height: 320px;
+  fill: #eee;
+  stroke: #eee;
+  stroke-linecap: round;
+}
+.clock-ticks {
+  stroke: #747780;
+  stroke-width: 2;
+}
+#clock-hour {
+  stroke-width: 8;
+}
+#clock-minute {
+  stroke-width: 5;
+}
+#clock-second {
+  stroke: #ceb995;
+  stroke-width: 1.5;
+}
+#clock-period {
+  display: block;
+  margin-top: 12px;
+  font-size: 24px;
+  color: #91949c;
+}
+.timeline {
+  position: relative;
+  touch-action: none;
+  cursor: ew-resize;
+}
+.timeline::before {
+  content: "";
+  position: absolute;
+  top: -16px;
+  bottom: -8px;
+  left: 0;
+  right: 0;
+}
+#scrub-overlay {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 4;
+  background: #000b;
+  pointer-events: none;
+}
+#seek-time {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  font-size: 96px;
+  font-weight: 300;
+  letter-spacing: -4px;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  color: #fff;
+}
+
+@media (max-width: 650px) {
+  #clock-bold-time {
+    font-size: 88px;
+    letter-spacing: -4px;
+  }
+  #clock-analog svg {
+    width: 280px;
+    height: 280px;
+  }
+  #seek-time {
+    font-size: 72px;
+  }
+}
+
+#artwork {
+  position: relative;
+}
+#player-cycle {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 64px;
+  height: 64px;
+  border-radius: 50%;
+  background: #151719e6;
+  border: 1px solid #ffffff30;
+  z-index: 2;
+}
+#player-cycle svg {
+  position: static;
+  width: 28px;
+  height: 28px;
+  transform: none;
+  stroke: #fff;
+  stroke-width: 2;
+  fill: none;
+}
+#weather-layout {
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+*:focus {
+  outline: none !important;
+}
+*:focus-visible {
+  outline: none !important;
+}
+#clock,
+#weather {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+#player-cycle.touch-feedback svg {
+  transform: scale(0.9);
+}
+
+#feedback {
+  width: 240px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+#volume-ui {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  z-index: 5;
+  pointer-events: none;
+}
+.volume-shade {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: linear-gradient(to left, #000b, transparent 55%);
+}
+.volume-dial {
+  position: absolute;
+  top: 28px;
+  right: 0;
+  width: 168px;
+  height: 244px;
+}
+
+#volume-value {
+  position: absolute;
+  right: 60px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 100px;
+  text-align: center;
+  font-size: 44px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+#volume-plus,
+#volume-minus {
+  position: absolute;
+  right: 70px;
+  width: 32px;
+  height: 32px;
+  text-align: center;
+  font-size: 22px;
+  line-height: 32px;
+  color: #777;
+  transition:
+    transform 0.1s ease,
+    color 0.1s ease;
+  transform: scale(0.8);
+}
+#volume-plus {
+  top: 48px;
+}
+#volume-minus {
+  bottom: 48px;
+}
+#volume-plus.active,
+#volume-minus.active {
+  color: #b7df9e;
+  transform: scale(1.25);
+  text-shadow: 0 0 10px #b7df9e55;
+}
+
+.forecast {
+  width: max-content;
+  margin: 0 auto;
+}
+.forecast-row {
+  display: grid;
+  grid-template-columns: 72px max-content;
+  gap: 22px;
+  justify-content: start;
+}
+@media (max-width: 650px) {
+  .forecast {
+    width: auto;
+  }
+  .forecast-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+  }
+}
+/* The hardware dial overlaps the upper-right portion of the 800×480 panel. */
+@media (min-width: 651px) {
+  .details {
+    padding-right: 64px;
+  }
+  #clock-face {
+    right: 80px;
+  }
+  .weather-layout {
+    padding-right: 80px;
+  }
+}
+
+.minute-wheel button {
+  width: 104px;
+  height: 88px;
+  padding: 0;
+  font-variant-numeric: tabular-nums;
+}
+#timer-done {
+  font-size: 64px;
+  font-weight: 500;
+  margin-top: 28px;
+}
+#timer-layout.finished #timer-readout {
+  margin-top: 10px;
+  font-size: 72px;
+}
+#clock.timer-alert {
+  animation: timer-pulse 1.6s ease-in-out infinite;
+}
+@keyframes timer-pulse {
+  0%,
+  100% {
+    background: #09150e;
+  }
+  50% {
+    background: #225d37;
+  }
 }

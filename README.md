@@ -1,5 +1,7 @@
 # SideThing
 
+<img src="assets/logo.png" width="64" alt="SideThing logo" />
+
 Your Car Thing, your Mac, your own display. Now Playing, time, local weather and brightness—with large touch targets and simple controls.
 
 Plain HTML/CSS/JS on the device. A small Swift menu-bar helper on the Mac. No account, cloud backend, Electron app or Node runtime. SideThing runs independently of DeskThing and Thing Labs applications.
@@ -19,7 +21,7 @@ cd sidething
 ./device/install.sh
 ```
 
-Setup builds and opens the Mac helper. Allow location access for weather. Device installation saves verified private backups, installs SideThing’s startup and replaces the old boot screens. Reboot once afterward. Keep the menu-bar helper running; USB reconnects are automatic.
+Setup builds and opens the Mac helper. Allow location access for weather and Music automation for direct playback, shuffle and repeat. Device installation saves verified private backups, installs SideThing’s startup and replaces the old boot screens. Reboot once afterward. Keep the menu-bar helper running; USB reconnects are automatic.
 
 ## Set up with an agent
 
@@ -29,7 +31,16 @@ Give your coding agent the GitHub URL and this prompt:
 
 ## Controls
 
-Top buttons: **1 Now Playing · 2 Time · 3 Weather · 4 Settings · 5 screen on/off**. The front button cycles pages. Turn the dial for Mac volume, or brightness in Settings; press it to play/pause. Tap the speaker icon to choose the Mac’s audio output. Video seeking is ±10 seconds. Weather uses current location and shows the next five days.
+Top buttons: **1 Now Playing · 2 Time · 3 Weather · 4 Settings · 5 screen on/off**. The front button cycles pages.
+
+- **Dial:** volume normally, minutes in the timer selector, brightness on Settings.
+- **Dial press:** play/pause media; start/pause the timer, or dismiss its Done screen.
+- **Clock:** tap anywhere through five clock styles and the timer. Choose minutes with the dial, touch controls or drag. Completion opens a pulsing alert; checkmark dismisses it, replay restarts the same duration.
+- **Weather:** tap anywhere to switch between five days and five hours.
+- **Playback:** drag the timeline to seek with a large preview above your finger. Video skips ±10 seconds. The artwork arrow cycles supported players; new playback selects the latest player.
+- **Audio output:** tap the bottom-right icon to choose speakers or headphones. Volume feedback sits beside the physical dial; Settings also has a brightness slider.
+
+Night Shift follows the Mac’s enabled state and strength with an approximate display tint. Unsupported macOS versions leave the tint off.
 
 [All screens and interaction states](docs/screens.md) · [Optional video bridge](browser-bridge/README.md)
 
@@ -41,6 +52,8 @@ Use **Check for updates…** in the Mac menu bar, or run `./update.sh`. Updates 
 npm run check  # JS syntax + optimized Swift build
 npm test       # isolated fixtures; Node 22+ for development only
 ```
+
+Internal build and browser installation scripts live in `scripts/`; device installation and recovery live in `device/`.
 
 Edit `public/` for the display and `native/` for the helper. **Preview all screens** opens the interactive gallery. Test at 800×480, narrow widths and on the device. [Architecture and verification](docs/development.md).
 

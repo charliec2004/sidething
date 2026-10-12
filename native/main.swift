@@ -5,6 +5,10 @@ import Darwin
 import ImageIO
 import Network
 
+if CommandLine.arguments.count > 1, CommandLine.arguments[1] == "--music-control" {
+    runMusicCommand(Array(CommandLine.arguments.dropFirst(2)))
+}
+
 let env = ProcessInfo.processInfo.environment
 let port = UInt16(env["PORT"] ?? "4318") ?? 4318
 let seekStep = 10.0
@@ -96,6 +100,12 @@ final class Service {
     weak var device: USBDevice?
     var requestCurrentLocation: (() -> Void)?
     var locator: CurrentLocation?
+    let countdown = Countdown(file: runtime.appendingPathComponent("timer.json"))
+    var musicModes: [String: Any]?
+    var musicRefreshing = false, musicSignature = ""
+    var musicObserver: NSObjectProtocol?
+    var musicTermination: NSObjectProtocol?
+    var nightShift: [String: Any] = ["supported": false, "enabled": false, "strength": 0]
     var listener: NWListener!
     var peers: [UUID: Peer] = [:]
     var media: [String: Any] = ["status": "loading", "kind": "unknown"]
@@ -110,12 +120,10 @@ final class Service {
     var previousState = Data()
     let streamQueue = DispatchQueue(label: "carthing.metadata", qos: .utility)
     var streamBuffer = Data()
-    var bridge: [String: Any]?
-    var bridgeDate = Date.distantPast
+    let players = Players()
     var nativePayload: [String: Any] = [:]
     var browserCommand: (id: String, peer: Peer)?
     var browserTimeout: Timer?
-    var bridgeThumbnail = "", bridgeImage = Data(), bridgeHash = ""
     let helper =
         env["CARTHING_MEDIA_BIN"]
         ?? resources.appendingPathComponent("media-control/bin/media-control").path
@@ -138,9 +146,38 @@ final class Service {
             }
         }
         listener.start(queue: .main)
+        if !CommandLine.arguments.contains("--headless") {
+            SideThingNightShiftStart { [weak self] in self?.refreshNightShift() }
+            refreshNightShift()
+        }
+        countdown.changed = { [weak self] in self?.publish() }
+        countdown.completed = {
+            if !CommandLine.arguments.contains("--headless") { NSSound(named: "Glass")?.play() }
+        }
+        countdown.start()
+        if !CommandLine.arguments.contains("--headless") {
+            musicObserver = DistributedNotificationCenter.default().addObserver(
+                forName: Notification.Name("com.apple.Music.playerInfo"), object: nil, queue: .main
+            ) { [weak self] _ in self?.refreshMusic() }
+            musicTermination = NSWorkspace.shared.notificationCenter.addObserver(
+                forName: NSWorkspace.didTerminateApplicationNotification, object: nil, queue: .main
+            ) { [weak self] notification in
+                guard
+                    let application = notification.userInfo?[NSWorkspace.applicationUserInfoKey]
+                        as? NSRunningApplication, application.bundleIdentifier == "com.apple.Music",
+                    let self = self
+                else { return }
+                self.players.remove("com.apple.Music")
+                self.musicModes = nil
+                self.selectPlayer()
+                self.publish()
+            }
+            refreshMusic()
+        }
         SystemAudio.start { [weak self] in self?.publish() }
         startStream()
         heartbeat = Timer.scheduledTimer(withTimeInterval: 20, repeats: true) { [weak self] _ in
+            self?.refreshNightShift()
             self?.publish()
             self?.peers.values.filter { !$0.pending }.forEach {
                 $0.push(Data(": keepalive\n\n".utf8))
@@ -156,14 +193,17 @@ final class Service {
         config["location"] = currentLocation ?? NSNull()
         config["timeZone"] = TimeZone.current.identifier
         config["utcOffsetSeconds"] = TimeZone.current.secondsFromGMT(for: Date())
-        return ["media": media, "weather": weather, "config": config, "hardware": hardware()]
+        return [
+            "media": media, "weather": weather, "config": config, "hardware": hardware(),
+            "timer": countdown.snapshot, "serverTime": Date().timeIntervalSince1970 * 1000,
+        ]
     }
     func hardware() -> [String: Any] {
         [
             "brightness": device?.brightness ?? 92, "displayOn": device?.displayOn ?? true,
             "connected": device?.attached ?? false, "output": SystemAudio.current["output"]!,
             "outputRevision": SystemAudio.current["outputRevision"] ?? 0,
-            "volume": SystemAudio.current["volume"]!,
+            "volume": SystemAudio.current["volume"]!, "nightShift": nightShift,
         ]
     }
     func publish() {
@@ -234,7 +274,8 @@ final class Service {
             sourceArtwork = ""
             nativeArtwork.removeAll()
             nativeArtworkHash = ""
-            applyBridge(browser: true)
+            players.nativeChanged("")
+            selectPlayer()
             publish()
             return
         }
@@ -261,18 +302,38 @@ final class Service {
             if encoded.count <= 7_000_000, let bytes = Data(base64Encoded: encoded), !bytes.isEmpty
             {
                 nativeArtwork = thumbnail(bytes)
-                nativeArtworkHash = nativeArtwork.isEmpty ? "" : String(
-                    SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined().prefix(24))
+                nativeArtworkHash =
+                    nativeArtwork.isEmpty
+                    ? ""
+                    : String(
+                        SHA256.hash(data: bytes).map { String(format: "%02x", $0) }.joined().prefix(
+                            24))
             } else {
                 nativeArtwork.removeAll()
                 nativeArtworkHash = ""
             }
         }
         artwork = nativeArtwork
+        if artwork.isEmpty, let previous = players.items[source],
+            text(previous.media["title"]) == text(media["title"]),
+            text(previous.media["artist"]) == text(media["artist"])
+        {
+            artwork = previous.artwork
+        }
         artworkHash = nativeArtworkHash
         media["seekStep"] = seekStep
         media["artworkVersion"] = artworkHash
-        applyBridge(browser: browser)
+
+        let appleMusic = source == "com.apple.Music"
+        if appleMusic, let modes = musicModes { media.merge(modes) { _, next in next } }
+        let signature =
+            appleMusic
+            ? [source, text(m["title"]), String(m["playing"] as? Bool ?? false)].joined(
+                separator: "|") : ""
+        if signature != musicSignature {
+            musicSignature = signature
+            if appleMusic { refreshMusic() }
+        }
         let video = media["kind"] as? String == "video"
         media["capabilities"] = [
             "seek": numeric(media["duration"]) > 0,
@@ -280,7 +341,106 @@ final class Service {
             "shuffle": !video && !(media["shuffleMode"] is NSNull),
             "repeat": !video && !(media["repeatMode"] is NSNull),
         ]
+        players.nativeChanged(source)
+        // A bridged tab replaces the browser's anonymous MediaRemote card.
+        if !browser || !players.items.keys.contains(where: { $0.hasPrefix("browser:") }) {
+            players.update(source, media: media, artwork: artwork)
+        }
+        selectPlayer()
         publish()
+    }
+    func selectPlayer() {
+        if let player = players.current {
+            media = player.media
+            media["sourceId"] = players.selected
+            media["sourceCount"] = players.items.count
+            artwork = player.artwork
+            artworkHash =
+                artwork.isEmpty
+                ? ""
+                : String(
+                    SHA256.hash(data: artwork).map { String(format: "%02x", $0) }.joined().prefix(
+                        24))
+            media["artworkVersion"] = artworkHash
+        } else {
+            media = ["status": "empty", "kind": "unknown"]
+            artwork.removeAll()
+            artworkHash = ""
+        }
+    }
+    func updateMusic(_ value: [String: Any]) {
+        if text(nativePayload["bundleIdentifier"]) == "com.apple.Music" {
+            if text(nativePayload["title"]) != text(value["title"]) {
+                nativeArtwork.removeAll()
+                nativeArtworkHash = ""
+                sourceArtwork = ""
+                nativePayload["artworkData"] = nil
+            }
+            for key in ["title", "artist", "playing"] { nativePayload[key] = value[key] }
+            nativePayload["elapsedTimeMicros"] = numeric(value["elapsed"]) * 1_000_000
+            nativePayload["durationMicros"] = numeric(value["duration"]) * 1_000_000
+            nativePayload["timestampEpochMicros"] = numeric(value["timestamp"]) * 1000
+        }
+        musicModes = ["repeatMode": value["repeatMode"]!, "shuffleMode": value["shuffleMode"]!]
+        guard !text(value["title"]).isEmpty else {
+            players.remove("com.apple.Music")
+            selectPlayer()
+            publish()
+            return
+        }
+        var m = value
+        m["status"] = "ready"
+        m["source"] = "com.apple.Music"
+        m["kind"] = "music"
+        m["rate"] = 1
+        m["seekStep"] = seekStep
+        m["capabilities"] = [
+            "seek": numeric(m["duration"]) > 0, "skip": true, "shuffle": true, "repeat": true,
+        ]
+        let previous = players.items["com.apple.Music"]
+        var image =
+            text(previous?.media["title"]) == text(m["title"])
+            ? (previous?.artwork ?? Data()) : Data()
+        if image.isEmpty, text(nativePayload["bundleIdentifier"]) == "com.apple.Music",
+            text(nativePayload["title"]) == text(m["title"])
+        {
+            image = nativeArtwork
+        }
+        if image.isEmpty, let encoded = value["artworkData"] as? String,
+            let bytes = Data(base64Encoded: encoded)
+        {
+            image = thumbnail(bytes)
+        }
+        m["artworkData"] = nil
+        players.update("com.apple.Music", media: m, artwork: image)
+        selectPlayer()
+        publish()
+    }
+    func refreshNightShift() {
+        guard !CommandLine.arguments.contains("--headless") else { return }
+        let next = SideThingNightShiftRead() as! [String: Any]
+        if json(next) != json(nightShift) {
+            nightShift = next
+            publish()
+        }
+    }
+    func refreshMusic() {
+        guard !musicRefreshing,
+            !CommandLine.arguments.contains("--headless") || env["CARTHING_MUSIC_BIN"] != nil,
+            env["CARTHING_MUSIC_BIN"] != nil
+                || !NSRunningApplication.runningApplications(
+                    withBundleIdentifier: "com.apple.Music"
+                ).isEmpty
+        else { return }
+        musicRefreshing = true
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            let value = musicCommand()
+            DispatchQueue.main.async {
+                guard let self = self else { return }
+                self.musicRefreshing = false
+                if let value = value { self.updateMusic(value) }
+            }
+        }
     }
     func thumbnail(_ bytes: Data) -> Data {
         guard
@@ -297,34 +457,6 @@ final class Service {
         return NSBitmapImageRep(cgImage: image).representation(
             using: .jpeg, properties: [.compressionFactor: 0.82]) ?? Data()
     }
-    func applyBridge(browser: Bool) {
-        guard browser, let b = bridge, Date().timeIntervalSince(bridgeDate) < 180 else { return }
-        // A paused page may not overwrite a different active browser session.
-        guard
-            b["playing"] as? Bool == true || text(b["title"]) == text(media["title"])
-                || media["status"] as? String == "empty"
-        else { return }
-        media["status"] = "ready"
-        media["kind"] = "video"
-        media["title"] = b["title"]
-        media["artist"] = b["creator"]
-        media["website"] = b["website"]
-        media["seekStep"] = seekStep
-        media["source"] = "browser-bridge"
-        media["playing"] = b["playing"]
-        media["elapsed"] = b["elapsed"]
-        media["duration"] = b["duration"]
-        media["timestamp"] = b["timestamp"]
-        media["rate"] = 1
-        media["capabilities"] = [
-            "seek": numeric(b["duration"]) > 0, "skip": false, "repeat": false, "shuffle": false,
-        ]
-        if !bridgeImage.isEmpty {
-            artwork = bridgeImage
-            artworkHash = bridgeHash
-            media["artworkVersion"] = bridgeHash
-        }
-    }
     func validSettings(_ v: [String: Any]) -> Bool {
         ["fahrenheit", "celsius"].contains(text(v["unit"]))
             && Set(v.keys).isSubset(of: ["unit", "location"])
@@ -338,6 +470,7 @@ final class Service {
             "latitude": "\(numeric(l["latitude"]))", "longitude": "\(numeric(l["longitude"]))",
             "current": "temperature_2m,apparent_temperature,weather_code",
             "daily": "temperature_2m_max,temperature_2m_min,precipitation_probability_max",
+            "hourly": "temperature_2m", "forecast_hours": "6",
             "temperature_unit": text(settings["unit"]), "forecast_days": "6", "timezone": "auto",
         ].map { URLQueryItem(name: $0.key, value: $0.value) }
         let revision = json(["location": l, "unit": settings["unit"]!])
@@ -362,6 +495,7 @@ final class Service {
                 {
                     self.weather = [
                         "status": "ready", "current": current, "daily": daily,
+                        "hourly": v["hourly"] ?? [:],
                         "updated": Date().timeIntervalSince1970 * 1000,
                     ]
                 } else {
@@ -381,8 +515,7 @@ final class Service {
                 let browser = self.peers[peerID]?.browser == true
                 self.peers.removeValue(forKey: peerID)
                 if browser {
-                    self.bridge = nil
-                    self.bridgeImage.removeAll()
+                    self.players.removeBrowser()
                     self.ingest(self.nativePayload)
                 }
             }
@@ -496,7 +629,8 @@ final class Service {
         }
         guard
             [
-                "/api/state", "/api/events", "/api/artwork", "/api/control", "/api/hardware",
+                "/api/state", "/api/timer", "/api/source", "/api/events", "/api/artwork",
+                "/api/control", "/api/hardware",
                 "/api/outputs", "/api/location", "/api/settings", "/api/browser",
             ].contains(route)
         else {
@@ -509,7 +643,10 @@ final class Service {
         }
         let now = Date().timeIntervalSince1970
         let recent = (rates[route] ?? []).filter { now - $0 < 60 }
-        guard recent.count < (route == "/api/hardware" ? 1200 : route == "/api/state" ? 180 : 60)
+        guard
+            recent.count
+                < ((route == "/api/hardware" || route == "/api/timer")
+                    ? 1200 : route == "/api/state" ? 180 : 60)
         else {
             failHTTP(429, "Please wait before retrying.")
             return
@@ -575,6 +712,45 @@ final class Service {
             }
             reply(peer, 200, json(["ok": true]))
             DispatchQueue.main.async(execute: choose)
+            return
+        }
+        if route == "/api/source" {
+            guard text(v["action"]) == "cycle", !controlBusy else {
+                failHTTP(409, "Player switch unavailable")
+                return
+            }
+            players.cycle()
+            selectPlayer()
+            publish()
+            reply(peer, 200, json(snapshot()))
+            return
+        }
+        if route == "/api/timer" {
+            let action = text(v["action"])
+            guard ["adjust", "set", "toggle", "reset", "replay"].contains(action) else {
+                failHTTP(400, "Invalid timer action")
+                return
+            }
+            var minutes = 0
+            if action == "adjust" || action == "set" {
+                guard let value = v["minutes"] as? NSNumber,
+                    CFGetTypeID(value) != CFBooleanGetTypeID(), value.doubleValue.isFinite,
+                    value.doubleValue == Double(value.intValue),
+                    action == "set"
+                        ? (1...1440).contains(value.intValue)
+                        : (-1440...1440).contains(value.intValue) && value.intValue != 0
+                else {
+                    failHTTP(400, "Timer changes use whole minutes")
+                    return
+                }
+                minutes = value.intValue
+            }
+            countdown.apply(action, minutes: minutes)
+            reply(
+                peer, 200,
+                json([
+                    "timer": countdown.snapshot, "serverTime": Date().timeIntervalSince1970 * 1000,
+                ]))
             return
         }
         if route == "/api/hardware" {
@@ -669,36 +845,58 @@ final class Service {
                 failHTTP(400, "Unsupported video page")
                 return
             }
+            var id = "browser:" + url.absoluteString
+            if let tab = v["tabId"] as? NSNumber {
+                guard CFGetTypeID(tab) != CFBooleanGetTypeID(),
+                    tab.doubleValue == Double(tab.intValue), tab.intValue >= 0
+                else {
+                    failHTTP(400, "Invalid tab")
+                    return
+                }
+                id = "browser:\(tab.intValue)"
+            }
             if v["ended"] as? Bool == true {
-                bridge = nil
-                bridgeImage.removeAll()
-                bridgeThumbnail = ""
-                ingest(nativePayload)
+                players.remove(id)
+                selectPlayer()
+                publish()
                 reply(peer, 200, json(["ok": true]))
                 return
             }
-            if bridge?["url"] as? String != url.absoluteString {
-                bridgeImage.removeAll()
-                bridgeThumbnail = ""
+            let old = players.items[id]
+            var image = old?.artwork ?? Data()
+            var encoded = old?.encoded ?? ""
+            if text(old?.media["title"]) != text(v["title"]) {
+                image = Data()
+                encoded = ""
             }
-            bridge = [
-                "title": text(v["title"]), "creator": text(v["creator"]), "url": url.absoluteString,
+            if let next = v["thumbnail"] as? String, next.count < 150_000, next != encoded,
+                let bytes = Data(base64Encoded: next)
+            {
+                encoded = next
+                image = thumbnail(bytes)
+            }
+            let m: [String: Any] = [
+                "status": "ready", "source": "browser-bridge", "kind": "video",
+                "tabId": v["tabId"] ?? NSNull(),
+                "title": text(v["title"]), "artist": text(v["creator"]),
                 "website": host.contains("youtube") ? "youtube" : "x",
                 "playing": v["playing"] as? Bool ?? false, "elapsed": max(0, numeric(v["elapsed"])),
                 "duration": min(864000, max(0, numeric(v["duration"]))),
                 "timestamp": Date().timeIntervalSince1970 * 1000,
+                "rate": 1, "seekStep": seekStep,
+                "capabilities": [
+                    "seek": numeric(v["duration"]) > 0, "skip": false, "repeat": false,
+                    "shuffle": false,
+                ],
             ]
-            bridgeDate = Date()
-            if let encoded = v["thumbnail"] as? String, encoded.count < 150_000,
-                encoded != bridgeThumbnail, let bytes = Data(base64Encoded: encoded)
+            if players.native.lowercased().contains("chrome")
+                || players.native.lowercased().contains("safari")
             {
-                bridgeThumbnail = encoded
-                bridgeImage = thumbnail(bytes)
-                bridgeHash = String(
-                    SHA256.hash(data: bridgeImage).map { String(format: "%02x", $0) }.joined()
-                        .prefix(24))
+                players.remove(players.native)
             }
-            ingest(nativePayload)
+            players.update(id, media: m, artwork: image, encoded: encoded)
+            selectPlayer()
+            publish()
             reply(peer, 200, json(["ok": true]))
             return
         }
@@ -710,7 +908,7 @@ final class Service {
         guard
             [
                 "toggle-play-pause", "next-track", "previous-track", "seek-back", "seek-forward",
-                "shuffle", "repeat",
+                "shuffle", "repeat", "seek",
             ].contains(action)
         else {
             failHTTP(400, "Unknown action")
@@ -720,9 +918,24 @@ final class Service {
             failHTTP(409, "Player unavailable or command pending.")
             return
         }
+        if let target = v["sourceId"] as? String, target != players.selected {
+            failHTTP(409, "Player changed. Try again.")
+            return
+        }
         let caps = media["capabilities"] as? [String: Bool] ?? [:]
+        var absoluteSeek: Double?
+        if action == "seek" {
+            guard caps["seek"] == true, let target = v["seconds"] as? NSNumber,
+                CFGetTypeID(target) != CFBooleanGetTypeID(), target.doubleValue.isFinite,
+                target.doubleValue >= 0, target.doubleValue <= numeric(media["duration"])
+            else {
+                failHTTP(400, "Invalid seek position")
+                return
+            }
+            absoluteSeek = target.doubleValue
+        }
         if media["source"] as? String == "browser-bridge" {
-            guard ["toggle-play-pause", "seek-back", "seek-forward"].contains(action),
+            guard ["toggle-play-pause", "seek-back", "seek-forward", "seek"].contains(action),
                 action == "toggle-play-pause" || caps["seek"] == true
             else {
                 failHTTP(409, "Control unavailable in this video.")
@@ -736,7 +949,11 @@ final class Service {
             let id = UUID().uuidString
             browserCommand = (id, peer)
             var packet = Data("event: browser-command\ndata: ".utf8)
-            packet.append(json(["id": id, "action": action, "seconds": seekStep]))
+            packet.append(
+                json([
+                    "id": id, "action": action, "seconds": absoluteSeek ?? seekStep,
+                    "tabId": media["tabId"] ?? NSNull(),
+                ]))
             packet.append(Data("\n\n".utf8))
             peers.values.filter { $0.browser }.forEach { $0.push(packet) }
             browserTimeout = Timer.scheduledTimer(withTimeInterval: 5, repeats: false) {
@@ -750,7 +967,7 @@ final class Service {
             }
             return
         }
-        var args = [action]
+        var args = absoluteSeek.map { ["seek", String($0)] } ?? [action]
         var expected: Int?
         if action == "repeat" || action == "shuffle" {
             guard caps[action] == true else {
@@ -789,14 +1006,27 @@ final class Service {
                         max(0, elapsed + (action == "seek-back" ? -seekStep : seekStep)))),
             ]
         }
+        let useMusic = media["source"] as? String == "com.apple.Music"
         controlBusy = true
         DispatchQueue.global(qos: .userInitiated).async { [weak self] in
             guard let self = self else { return }
-            let commandOK = executeTool(self.helper, args).ok
+            let musicResult =
+                useMusic
+                ? musicCommand(
+                    args[0], mode: expected, position: args[0] == "seek" ? Double(args[1]) : nil)
+                : nil
+            let commandOK = useMusic ? musicResult != nil : executeTool(self.helper, args).ok
             DispatchQueue.main.async {
                 if !commandOK {
                     self.controlBusy = false
                     failHTTP(503, "The player did not accept the command.")
+                    return
+                }
+                if let musicResult = musicResult {
+                    self.updateMusic(musicResult)
+                    self.refreshMusic()
+                    self.controlBusy = false
+                    self.reply(peer, 200, json(["ok": true]))
                     return
                 }
                 if let expected = expected {
@@ -833,6 +1063,14 @@ final class Service {
         refreshWeather()
     }
     func stop() {
+        SideThingNightShiftStop()
+        countdown.stop()
+        if let observer = musicTermination {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
+        if let observer = musicObserver {
+            DistributedNotificationCenter.default().removeObserver(observer)
+        }
         SystemAudio.stop()
         locator?.stop()
         shuttingDown = true

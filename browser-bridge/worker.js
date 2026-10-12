@@ -1,23 +1,21 @@
 const allowed = new Set(["www.youtube.com", "x.com", "twitter.com"]);
 let port,
-  activeTab,
   reconnect,
-  latest,
-  activePlaying = false,
   delay = 1000;
+const players = new Map();
 function connect() {
   port = chrome.runtime.connectNative("local.carthing.video");
   port.onMessage.addListener((message) => {
-    if (message.ready && latest) {
+    if (message.ready) {
       delay = 1000;
-      port.postMessage(latest);
+      players.forEach((value) => port.postMessage(value));
     }
     if (message.connected === false) {
       port.disconnect();
       return;
     }
-    if (message.action && activeTab !== undefined)
-      chrome.tabs.sendMessage(activeTab, message).catch(() => {});
+    if (message.action && players.has(message.tabId))
+      chrome.tabs.sendMessage(message.tabId, message).catch(() => {});
   });
   port.onDisconnect.addListener(() => {
     void chrome.runtime.lastError;
@@ -66,10 +64,8 @@ chrome.runtime.onMessage.addListener((message, sender) => {
     message.elapsed < 0
   )
     return;
-  if (activePlaying && activeTab !== sender.tab.id && !message.playing) return;
-  activeTab = sender.tab.id;
-  activePlaying = message.playing === true;
   const value = {
+    tabId: sender.tab.id,
     url: url.href.slice(0, 2048),
     title: message.title,
     creator: message.creator,
@@ -84,15 +80,18 @@ chrome.runtime.onMessage.addListener((message, sender) => {
     /^[A-Za-z0-9+/=]*$/.test(message.thumbnail)
   )
     value.thumbnail = message.thumbnail;
-  latest = value;
+  if (value.ended) players.delete(sender.tab.id);
+  else {
+    players.set(sender.tab.id, value);
+    if (players.size > 8) players.delete(players.keys().next().value);
+  }
   port?.postMessage(value);
 });
 
 chrome.tabs.onRemoved.addListener((id) => {
-  if (id === activeTab && latest) {
-    port?.postMessage({ ...latest, ended: true, playing: false });
-    latest = undefined;
-    activeTab = undefined;
-    activePlaying = false;
+  const value = players.get(id);
+  if (value) {
+    port?.postMessage({ ...value, ended: true, playing: false });
+    players.delete(id);
   }
 });

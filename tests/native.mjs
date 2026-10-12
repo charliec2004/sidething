@@ -33,11 +33,34 @@ if(args[0]==='stream') {let previous;const emit=()=>{const current=read(),diff=!
 else {const m=read();if(args[0]==='repeat'||args[0]==='shuffle')m[args[0]+'Mode']=Number(args[1]);if(args[0]==='toggle-play-pause')m.playing=!m.playing;if(args[0]==='previous-track'||args[0]==='next-track')m.title=args[0];if(args[0]==='seek')m.elapsedTimeMicros=Number(args[1])*1000000;m.timestampEpochMicros=Date.now()*1000;fs.writeFileSync(file,JSON.stringify(m));}
 `,
 );
+const musicFile = path.join(dir, "music.json");
+fs.writeFileSync(
+  musicFile,
+  JSON.stringify({
+    title: "Music fixture",
+    artist: "Music artist",
+    artworkData:
+      "iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAAAXNSR0IArs4c6QAAADhlWElmTU0AKgAAAAgAAYdpAAQAAAABAAAAGgAAAAAAAqACAAQAAAABAAAAEKADAAQAAAABAAAAEAAAAAAXnVPIAAABlklEQVQ4EZ1TSy8DURT+5k4tZKpBTEu3VjQeayvSFhGPxMKK8E8kIhKxEMEv8AukTWhVYiVYYKPViFc0GlX0JbNgpuaMznRuIlHu4p7H/b7vnrlzjoDKcrlczWWxvk9kQouZ+8mqWjkrqMphoVB4pXOBtoYmz6jI2JYeNVL86yojp2raTPHtKSzQzaxOuq6ZbKrrItrHezujsv9MJhG9WuI67N88GPSjt6cbmcyzeQ9nRVHERTyBo+MTI09chx0xPBjE6toGGDOexn5k+KqqYXN9FROTU9YZJxBPXOIhlYJbllEslaAoigFs9XiwuDCPnUgU26GwRSaHcVEl6Ory4SC2C6qIltfbhsd0Gm63XEFUDVdBNQ1ITgmy/N0Sp2fnyOXzuLu7x9zstB2GHwWSySv0+4eQzb5Y4JubW8u3O5zA+OgIonv7xiM6HRKckmTHQtPK8HV2cDlOYGl5BYHAANRPlQOZAb1BJBozQ8MKRhuLLMRlawz03zrGaDCgt2WNnCpM5xCX0VTRYPxJpDJMxLVa7r/j/AW5sZUWznyOgQAAAABJRU5ErkJggg==",
+    playing: true,
+    elapsed: 10,
+    duration: 180,
+    shuffleMode: 1,
+    repeatMode: 1,
+  }),
+);
+let providerSource = fs.readFileSync(provider, "utf8");
+providerSource = providerSource.replace(
+  "if(args[0]==='stream')",
+  `if(args[0]==='--music-control') {const f=${JSON.stringify(musicFile)},m=JSON.parse(fs.readFileSync(f));if(args[1]==='repeat'||args[1]==='shuffle')m[args[1]+'Mode']=Number(args[2]);if(args[1]==='toggle-play-pause')m.playing=!m.playing;if(args[1]==='seek')m.elapsed=Number(args[2]);m.timestamp=Date.now();fs.writeFileSync(f,JSON.stringify(m));console.log(JSON.stringify(m));process.exit(0);}
+if(args[0]==='stream')`,
+);
+fs.writeFileSync(provider, providerSource);
 fs.chmodSync(provider, 0o700);
 const env = {
   ...process.env,
   PORT: "4320",
   CARTHING_MEDIA_BIN: provider,
+  CARTHING_MUSIC_BIN: provider,
   CARTHING_DATA_DIR: dir,
 };
 const binary = path.join(root, "CarThing.app/Contents/MacOS/CarThing");
@@ -229,10 +252,48 @@ try {
     async () => (await state()).media.elapsed === 50,
     "forward exactly 10 seconds",
   );
+  assert.equal(
+    (await post("/api/control", { action: "seek", seconds: true })).status,
+    400,
+  );
+  assert.equal(
+    (await post("/api/control", { action: "seek", seconds: 101 })).status,
+    400,
+  );
+  assert.equal(
+    (await post("/api/control", { action: "seek", seconds: 12.5 })).status,
+    200,
+  );
+  await until(
+    async () => (await state()).media.elapsed === 12.5,
+    "absolute seeking",
+  );
+  assert.equal(
+    (await post("/api/timer", { action: "set", minutes: true })).status,
+    400,
+  );
+  assert.equal(
+    (await post("/api/timer", { action: "adjust", minutes: 1.5 })).status,
+    400,
+  );
+  assert.equal(
+    (await post("/api/timer", { action: "set", minutes: 15 })).status,
+    200,
+  );
+  assert.equal((await state()).timer.remaining, 900);
+  await post("/api/timer", { action: "toggle" });
+  await pause(100);
+  await post("/api/timer", { action: "toggle" });
+  assert.equal((await state()).timer.phase, "paused");
   const saved = session.token;
   for (let i = 0; i < 10; i++) {
     await stop(child);
     await start();
+    assert.equal(
+      (await state()).timer.phase,
+      "paused",
+      "timer survives restart",
+    );
     assert.equal(session.token, saved, "pairing survives repeated restart");
   }
   const extension = fs
@@ -281,6 +342,33 @@ try {
     "X bridge metadata",
   );
   assert.equal((await state()).media.artist, "@fixture");
+  send({
+    tabId: 2,
+    url: "https://www.youtube.com/watch?v=fixture",
+    title: "Other video",
+    creator: "Creator",
+    playing: true,
+    duration: 100,
+    elapsed: 1,
+  });
+  await until(
+    async () => (await state()).media.title === "Other video",
+    "latest started player",
+  );
+  assert.equal((await state()).media.sourceCount, 2);
+  const selected = (await state()).media.sourceId;
+  await post("/api/source", { action: "cycle" });
+  assert.equal((await state()).media.title, "Fixture X video");
+  assert.equal(
+    (
+      await post("/api/control", {
+        action: "toggle-play-pause",
+        sourceId: selected,
+      })
+    ).status,
+    409,
+  );
+
   const pending = post("/api/control", { action: "seek-forward" });
   await until(
     () => messages.some((m) => m.action === "seek-forward"),
@@ -304,6 +392,86 @@ try {
     ).status,
     400,
   );
+  fs.writeFileSync(
+    file,
+    JSON.stringify({
+      ...initial,
+      title: "Music fixture",
+      artist: "Music artist",
+      artworkData: fs
+        .readFileSync(path.join(root, "assets/logo.png"))
+        .toString("base64"),
+      bundleIdentifier: "com.apple.Music",
+      shuffleMode: null,
+      repeatMode: null,
+      playing: true,
+    }),
+  );
+  await until(
+    async () =>
+      (await state()).media.source === "com.apple.Music" &&
+      (await state()).media.capabilities.shuffle,
+    "direct Music modes",
+  );
+  const musicArtworkVersion = (await state()).media.artworkVersion;
+  assert.ok(musicArtworkVersion, "native Music artwork is present");
+  assert.equal((await state()).media.sourceCount, 3);
+  assert.equal(
+    (
+      await post("/api/control", {
+        action: "shuffle",
+        sourceId: "com.apple.Music",
+      })
+    ).status,
+    200,
+  );
+  assert.equal(JSON.parse(fs.readFileSync(musicFile)).shuffleMode, 3);
+  await post("/api/source", { action: "cycle" });
+  assert.equal((await state()).media.title, "Other video");
+  send({
+    tabId: 2,
+    url: "https://www.youtube.com/watch?v=fixture",
+    title: "Other video",
+    creator: "Creator",
+    playing: true,
+    duration: 100,
+    elapsed: 4,
+  });
+  await pause(100);
+  assert.equal((await state()).media.title, "Other video");
+  await post("/api/source", { action: "cycle" });
+  await post("/api/source", { action: "cycle" });
+  assert.equal((await state()).media.source, "com.apple.Music");
+  assert.equal(
+    (
+      await post("/api/control", {
+        action: "toggle-play-pause",
+        sourceId: "com.apple.Music",
+      })
+    ).status,
+    200,
+  );
+  assert.equal(
+    (await state()).media.artworkVersion,
+    musicArtworkVersion,
+    "play/pause retains the same cover instead of replacing it with scripting artwork",
+  );
+  assert.equal(
+    JSON.parse(fs.readFileSync(musicFile)).playing,
+    false,
+    "viewed Music controls go to Music behind video",
+  );
+  assert.equal(
+    (
+      await post("/api/control", {
+        action: "seek",
+        seconds: 15,
+        sourceId: "com.apple.Music",
+      })
+    ).status,
+    200,
+  );
+  assert.equal(JSON.parse(fs.readFileSync(musicFile)).elapsed, 15);
   console.log(
     "PASS: incremental metadata and deleted fields; native playback dispatch and streamed state; repeat off/all/one; shuffle; music/video capabilities; seeking exactly ±10 seconds; authentication/origin/input validation; 20 closed SSE clients released; saved pairing after 10 restarts; browser native-messaging metadata, commands and acknowledgement. Fixture provider only; real media unchanged.",
   );

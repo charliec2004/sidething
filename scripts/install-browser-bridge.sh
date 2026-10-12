@@ -1,10 +1,10 @@
 #!/bin/zsh
 set -euo pipefail
-cd "${0:A:h}"
+cd "${0:A:h:h}"
 # Run after loading browser-bridge unpacked in your Chromium browser.
 # Argument is the exact browser profile parent containing NativeMessagingHosts.
 if (( $# != 1 )); then
-  print -u2 'Usage: ./install-browser-bridge.sh "/absolute/browser/profile-parent"'
+  print -u2 'Usage: ./scripts/install-browser-bridge.sh "/absolute/browser/profile-parent"'
   exit 1
 fi
 python3 - "$1" "${PWD}" <<'PY'

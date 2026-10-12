@@ -9,7 +9,7 @@ git fetch origin "refs/tags/${release_tag}:refs/tags/${release_tag}"
 git merge --ff-only "$release_tag"
 previous_app="$(mktemp -d -t sidething-update)"
 cp -R CarThing.app "$previous_app/CarThing.app"
-if ! ./build.sh; then
+if ! ./scripts/build.sh; then
   mv CarThing.app "$previous_app/failed-app"
   ditto "$previous_app/CarThing.app" CarThing.app
   print -u2 "Build failed. The previous app was restored; saved copy: $previous_app"

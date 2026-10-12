@@ -8,3 +8,5 @@ session.json
 device.json
 settings.json
 backups/
+timer.json
+*.iconset/

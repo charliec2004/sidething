@@ -1,12 +1,12 @@
 # Optional video bridge
 
-Use this only when your Chromium browser or video site does not supply Mac Now Playing metadata. The extension is limited to YouTube, X and Twitter.
+Use this for switching between concurrent video tabs and Music, or when your browser does not supply Mac Now Playing metadata. The extension is limited to YouTube, X and Twitter.
 
 1. Open your browser’s extensions page, enable developer mode, and load this `browser-bridge/` folder unpacked.
 2. Register the native host using the **existing browser profile parent** that contains `NativeMessagingHosts`:
 
    ```sh
-   ./install-browser-bridge.sh "/absolute/browser/profile-parent"
+   ./scripts/install-browser-bridge.sh "/absolute/browser/profile-parent"
    ```
 
 3. Keep Car Thing running and reload the video page.

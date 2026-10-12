@@ -773,8 +773,8 @@ input[type="range"]::-webkit-slider-thumb {
 
 #output-button {
   position: absolute;
-  top: 16px;
-  right: 16px;
+  top: 192px;
+  left: 288px;
   width: 80px;
   height: 80px;
   padding: 0;
@@ -785,12 +785,24 @@ input[type="range"]::-webkit-slider-thumb {
   width: 32px;
   height: 32px;
 }
+.details {
+  padding-bottom: 84px;
+}
 .details h1 {
-  padding-right: 80px;
+  -webkit-line-clamp: 2;
+}
+#idle:not([hidden]) + #output-button {
+  top: 16px;
+  left: 16px;
 }
 @media (max-width: 650px) {
-  .details h1 {
-    padding-right: 0;
+  .details {
+    padding-bottom: 0;
+  }
+  #output-button {
+    top: auto;
+    bottom: 16px;
+    left: 16px;
   }
 }
 

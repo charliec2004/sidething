@@ -146,6 +146,15 @@
             </button>
           </div>
         </div>
+        <div id="idle" class="reconnecting">
+          <svg id="idleicon" viewBox="0 0 32 32" aria-hidden="true">
+            <path
+              d="M5 24a16 16 0 0 1 22 0M9 19a10 10 0 0 1 14 0M13 14a5 5 0 0 1 6 0"
+            />
+            <circle cx="16" cy="27" r="1" />
+          </svg>
+          <p id="idletext">Connecting</p>
+        </div>
         <button
           id="output-button"
           aria-label="Choose audio output"
@@ -157,15 +166,6 @@
             />
           </svg>
         </button>
-        <div id="idle" class="reconnecting">
-          <svg id="idleicon" viewBox="0 0 32 32" aria-hidden="true">
-            <path
-              d="M5 24a16 16 0 0 1 22 0M9 19a10 10 0 0 1 14 0M13 14a5 5 0 0 1 6 0"
-            />
-            <circle cx="16" cy="27" r="1" />
-          </svg>
-          <p id="idletext">Connecting</p>
-        </div>
       </section>
       <section id="weather" class="screen" aria-label="Weather" inert>
         <div id="weather-setup" hidden>

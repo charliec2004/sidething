@@ -232,7 +232,7 @@ h1 {
   grid-gap: 28px;
   align-items: center;
   justify-content: center;
-  margin: 0;
+  margin: 0 80px;
 }
 .controls button {
   justify-self: center;
@@ -458,11 +458,14 @@ button[aria-pressed="true"] i {
   }
   #display {
     height: 100vh;
-    min-height: 650px;
+    min-height: 780px;
     max-height: none;
   }
   .screen {
     padding: 24px;
+  }
+  #media {
+    padding-bottom: 104px;
   }
   .media-layout {
     grid-template-columns: 1fr;
@@ -495,6 +498,7 @@ button[aria-pressed="true"] i {
     line-height: 22px;
   }
   .controls {
+    margin: 0;
     grid-template-columns: 52px 52px 80px 52px 52px;
     grid-gap: 8px;
   }
@@ -773,8 +777,8 @@ input[type="range"]::-webkit-slider-thumb {
 
 #output-button {
   position: absolute;
-  top: 192px;
-  left: 288px;
+  bottom: 16px;
+  right: 16px;
   width: 80px;
   height: 80px;
   padding: 0;
@@ -785,30 +789,14 @@ input[type="range"]::-webkit-slider-thumb {
   width: 32px;
   height: 32px;
 }
-.details {
-  padding-bottom: 84px;
-}
-.details h1 {
-  -webkit-line-clamp: 2;
-}
-#idle:not([hidden]) + #output-button {
-  top: 16px;
-  left: 16px;
-}
-@media (max-width: 650px) {
-  .details {
-    padding-bottom: 0;
-  }
-  #output-button {
-    top: auto;
-    bottom: 16px;
-    left: 16px;
-  }
-}
 
 #outputs-list {
   overflow: auto;
   min-height: 0;
+  scrollbar-width: none;
+}
+#outputs-list::-webkit-scrollbar {
+  display: none;
 }
 .outputs-panel h2,
 #outputs-state,

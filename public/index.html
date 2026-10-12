@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>SideThing</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <svg class="symbols" aria-hidden="true">
+      <defs>
+        <symbol id="shuffle-icon" viewBox="0 0 24 24">
+          <path
+            d="M3 6h3c4 0 8 12 12 12h3m-4-4 4 4-4 4M3 18h3c1.5 0 3-2 4.5-4.5M14 9c1.5-2 2.5-3 4-3h3m-4-4 4 4-4 4"
+          />
+        </symbol>
+        <symbol id="repeat-icon" viewBox="0 0 24 24">
+          <path
+            d="M18 4l3 3-3 3M21 7H7a4 4 0 0 0-4 4m3 9-3-3 3-3M3 17h14a4 4 0 0 0 4-4"
+          />
+        </symbol>
+        <symbol id="back-icon" viewBox="0 0 24 24">
+          <path class="solid" d="M4 5h2v14H4zM19 5v14L7 12z" />
+        </symbol>
+        <symbol id="forward-icon" viewBox="0 0 24 24">
+          <path class="solid" d="M18 5h2v14h-2zM5 5l12 7-12 7z" />
+        </symbol>
+        <symbol id="play-icon" viewBox="0 0 24 24">
+          <path class="solid" d="M8 5 20 12 8 19Z" />
+        </symbol>
+        <symbol id="pause-icon" viewBox="0 0 24 24">
+          <path class="solid" d="M6 4h4v16H6zM14 4h4v16h-4z" />
+        </symbol>
+        <symbol id="seek-back-icon" viewBox="0 0 24 24">
+          <path d="M12 5a8 8 0 1 1-7.4 5M12 5H5m3-3L5 5l3 3" />
+          <text class="seek-label" x="12" y="13.5">10</text>
+        </symbol>
+        <symbol id="seek-forward-icon" viewBox="0 0 24 24">
+          <path
+            transform="translate(24 0) scale(-1 1)"
+            d="M12 5a8 8 0 1 1-7.4 5M12 5H5m3-3L5 5l3 3"
+          />
+          <text class="seek-label" x="12" y="13.5">10</text>
+        </symbol>
+        <symbol id="weather-sun" viewBox="0 0 100 100">
+          <circle cx="50" cy="50" r="22" />
+          <path
+            d="M50 8v9m0 66v9M8 50h9m66 0h9M20 20l7 7m46 46 7 7M20 80l7-7m46-46 7-7"
+          />
+        </symbol>
+        <symbol id="weather-cloud" viewBox="0 0 100 100">
+          <path
+            d="M25 64h51a16 16 0 0 0 0-32 23 23 0 0 0-43-6 14 14 0 0 0-21 15A13 13 0 0 0 25 64Z"
+          />
+        </symbol>
+        <symbol id="weather-rain" viewBox="0 0 100 100">
+          <use href="#weather-cloud" />
+          <path d="m31 75-5 12m25-12-5 12m25-12-5 12" />
+        </symbol>
+        <symbol id="weather-snow" viewBox="0 0 100 100">
+          <use href="#weather-cloud" />
+          <path
+            d="M30 74v14m-6-10 12 6m0-6-12 6M63 74v14m-6-10 12 6m0-6-12 6"
+          />
+        </symbol>
+        <symbol id="weather-fog" viewBox="0 0 100 100">
+          <use href="#weather-cloud" />
+          <path d="M18 75h64M26 85h48" />
+        </symbol>
+        <symbol id="weather-storm" viewBox="0 0 100 100">
+          <use href="#weather-cloud" />
+          <path d="m53 65-14 16h14l-8 13" />
+        </symbol>
+      </defs>
+    </svg>
+    <main id="display">
+      <section id="media" class="screen current" aria-label="Media player">
+        <div class="media-layout" hidden>
+          <div class="artwork" id="artwork">
+            <img id="art" alt="" hidden /><svg
+              id="placeholder"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <path d="M9 18V5l11-2v13M9 8l11-2" />
+              <ellipse cx="6" cy="18" rx="3" ry="2" />
+              <ellipse cx="17" cy="16" rx="3" ry="2" />
+            </svg>
+          </div>
+          <div class="details">
+            <div class="metadata" id="metadata">
+              <h1 id="title"></h1>
+              <p id="creator"></p>
+            </div>
+          </div>
+          <div class="timeline" id="timeline">
+            <div class="track"><div id="progress"></div></div>
+            <div class="times">
+              <span id="elapsed"></span><span id="duration"></span>
+            </div>
+          </div>
+          <div class="controls">
+            <button
+              id="shuffle"
+              data-action="shuffle"
+              aria-label="Shuffle"
+              aria-pressed="false"
+              hidden
+            >
+              <svg viewBox="0 0 24 24"><use href="#shuffle-icon" /></svg
+              ><i></i></button
+            ><button
+              id="back"
+              data-action="previous-track"
+              aria-label="Previous track"
+            >
+              <svg viewBox="0 0 24 24">
+                <use id="backicon" href="#back-icon" />
+              </svg></button
+            ><button
+              id="play"
+              data-action="toggle-play-pause"
+              aria-label="Play"
+            >
+              <svg viewBox="0 0 24 24">
+                <use id="playicon" href="#play-icon" />
+                <use id="pauseicon" href="#pause-icon" />
+              </svg></button
+            ><button
+              id="forward"
+              data-action="next-track"
+              aria-label="Next track"
+            >
+              <svg viewBox="0 0 24 24">
+                <use id="forwardicon" href="#forward-icon" />
+              </svg></button
+            ><button
+              id="repeat"
+              data-action="repeat"
+              aria-label="Repeat"
+              aria-pressed="false"
+              hidden
+            >
+              <svg viewBox="0 0 24 24"><use href="#repeat-icon" /></svg
+              ><span id="repeatone" hidden>1</span><i></i>
+            </button>
+          </div>
+        </div>
+        <button
+          id="output-button"
+          aria-label="Choose audio output"
+          hidden
+        >
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path
+              d="M3 9h4l5-4v14l-5-4H3zM16 8a6 6 0 0 1 0 8m3-11a10 10 0 0 1 0 14"
+            />
+          </svg>
+        </button>
+        <div id="idle" class="reconnecting">
+          <svg id="idleicon" viewBox="0 0 32 32" aria-hidden="true">
+            <path
+              d="M5 24a16 16 0 0 1 22 0M9 19a10 10 0 0 1 14 0M13 14a5 5 0 0 1 6 0"
+            />
+            <circle cx="16" cy="27" r="1" />
+          </svg>
+          <p id="idletext">Connecting</p>
+        </div>
+      </section>
+      <section id="weather" class="screen" aria-label="Weather" inert>
+        <div id="weather-setup" hidden>
+          <button id="choose-location" aria-label="Allow current location">
+            Allow location
+          </button>
+          <p id="location-state" hidden></p>
+        </div>
+        <div class="weather-layout" id="weather-layout">
+          <div>
+            <p id="place"></p>
+            <div class="temperature">
+              <span id="temperature">—</span><span class="degree">°</span>
+            </div>
+            <p id="condition"></p>
+            <p id="range"></p>
+          </div>
+          <div class="weather-side">
+            <svg id="weathericon" viewBox="0 0 100 100" aria-hidden="true">
+              <use id="weather-glyph" href="#weather-sun" />
+            </svg>
+            <div class="forecast" id="forecast"></div>
+          </div>
+        </div>
+        <p id="weatherstate" class="state-note"></p>
+      </section>
+      <section id="clock" class="screen" aria-label="Clock" inert>
+        <div class="clock-layout"><time id="time"></time></div>
+      </section>
+      <section id="settings" class="screen" aria-label="Settings" inert>
+        <div class="brightness-layout">
+          <svg
+            class="brightness-symbol"
+            viewBox="0 0 100 100"
+            aria-hidden="true"
+          >
+            <circle cx="50" cy="50" r="22" />
+            <path
+              d="M50 8v9m0 66v9M8 50h9m66 0h9M20 20l7 7m46 46 7 7M20 80l7-7m46-46 7-7"
+            />
+          </svg>
+          <div class="brightness-heading">
+            <label for="brightness">Brightness</label
+            ><output id="brightness-value" for="brightness">92%</output>
+          </div>
+          <input
+            id="brightness"
+            type="range"
+            min="5"
+            max="100"
+            step="1"
+            value="92"
+            aria-label="Brightness"
+          />
+        </div>
+      </section>
+      <div
+        id="outputs-dialog"
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="outputs-title"
+        hidden
+      >
+        <div class="outputs-panel">
+          <h2 id="outputs-title">Audio output</h2>
+          <button id="outputs-close" aria-label="Close audio outputs">
+            <svg viewBox="0 0 24 24"><path d="m6 6 12 12M18 6 6 18" /></svg>
+          </button>
+          <div id="outputs-list"></div>
+          <p id="outputs-state" role="status" hidden></p>
+          <button id="outputs-retry" hidden>Retry</button>
+        </div>
+      </div>
+    </main>
+    <div id="feedback" role="status" hidden></div>
+    <div id="notice" role="alert" hidden></div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>

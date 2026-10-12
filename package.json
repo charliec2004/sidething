@@ -1,0 +1,9 @@
+{
+  "name": "carthing-dashboard",
+  "private": true,
+  "scripts": {
+    "start": "./build.sh && open CarThing.app --args --open",
+    "check": "node --check public/app.js && node --check browser-bridge/worker.js && node --check browser-bridge/content.js && ./build.sh",
+    "test": "python3 tests/setup.py && python3 tests/branding.py && node tests/native.mjs && node tests/usb.mjs"
+  }
+}

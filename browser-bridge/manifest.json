@@ -1,0 +1,26 @@
+{
+  "manifest_version": 3,
+  "name": "Car Thing Video Bridge",
+  "version": "0.1.0",
+  "key": "MIIBIjANBgkqhkiG9w0BAQEFAAOCAQ8AMIIBCgKCAQEAxO/rnxgiAFJAj/h524uIt6NTzeD/w41UR3nDfbJ/KzNIt8IW7qGbioCSnmPLrHHvxgTkZI7NC+mXxu62yXCtsiJts0zEXM1f7BZhGR3KF12u0a/mbUnrJFmgMafbfYfWWWTR/oHCMvPd3GVNB5e/KWOeH7lLrk0cswnRZVy8kBYO6diLJ0PEYAjagb/o3RIQcaZsVss4+yvlcYy0dFlftPUmbpbfgPY5cKACQXDRLM/XgcWx7j0wdSKUTt1pvlCdlS+qsxOBFIF7QYAiNI+nrI3BGWvPTABU43Vb7r6HPcKIUL+nG3AP1k+8ZzrRTxjWx22kOIxfjoffGmV3XR7vNQIDAQAB",
+  "permissions": ["nativeMessaging"],
+  "host_permissions": [
+    "https://www.youtube.com/*",
+    "https://x.com/*",
+    "https://twitter.com/*"
+  ],
+  "background": {
+    "service_worker": "worker.js"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://www.youtube.com/*",
+        "https://x.com/*",
+        "https://twitter.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

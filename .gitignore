@@ -1,0 +1,10 @@
+.DS_Store
+CarThing.app/
+node_modules/
+__pycache__/
+*.img
+*.partial
+session.json
+device.json
+settings.json
+backups/

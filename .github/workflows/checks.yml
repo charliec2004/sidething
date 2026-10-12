@@ -1,0 +1,16 @@
+name: Checks
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  mac:
+    runs-on: macos-15
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install development dependencies
+        run: brew install ungive/media-control/media-control node
+      - name: Build and syntax checks
+        run: npm run check
+      - name: Isolated regression checks
+        run: npm test
